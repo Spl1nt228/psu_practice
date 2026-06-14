@@ -3,11 +3,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, TransactionType } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
+import { FindTransactionsQueryDto } from './dto/find-transactions-query.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
+import { TRANSACTION_MESSAGES } from './transactions.constants';
 
 @Injectable()
 export class TransactionsService {
@@ -20,7 +22,7 @@ export class TransactionsService {
       data: {
         categoryId: createTransactionDto.categoryId,
         amount: this.toDecimal(createTransactionDto.amount),
-        type: this.toTransactionType(createTransactionDto.type),
+        type: createTransactionDto.type,
         description: this.toDescription(createTransactionDto.description),
         date: this.toDate(createTransactionDto.date),
       },
@@ -30,15 +32,34 @@ export class TransactionsService {
     });
   }
 
-  findAll() {
-    return this.prisma.transaction.findMany({
-      include: {
-        category: true,
+  async findAll(query: FindTransactionsQueryDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.transaction.findMany({
+        include: {
+          category: true,
+        },
+        orderBy: {
+          date: 'desc',
+        },
+        skip,
+        take: limit,
+      }),
+      this.prisma.transaction.count(),
+    ]);
+
+    return {
+      data,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
       },
-      orderBy: {
-        date: 'desc',
-      },
-    });
+    };
   }
 
   async findOne(id: string) {
@@ -50,13 +71,17 @@ export class TransactionsService {
     });
 
     if (!transaction) {
-      throw new NotFoundException('Transaction not found');
+      throw new NotFoundException(TRANSACTION_MESSAGES.NOT_FOUND);
     }
 
     return transaction;
   }
 
   async update(id: string, updateTransactionDto: UpdateTransactionDto) {
+    if (Object.keys(updateTransactionDto).length === 0) {
+      throw new BadRequestException(TRANSACTION_MESSAGES.EMPTY_UPDATE);
+    }
+
     if (updateTransactionDto.categoryId) {
       await this.ensureCategoryExists(updateTransactionDto.categoryId);
     }
@@ -91,7 +116,7 @@ export class TransactionsService {
     });
 
     if (!category) {
-      throw new NotFoundException('Category not found');
+      throw new NotFoundException(TRANSACTION_MESSAGES.CATEGORY_NOT_FOUND);
     }
   }
 
@@ -107,7 +132,7 @@ export class TransactionsService {
     }
 
     if (updateTransactionDto.type !== undefined) {
-      data.type = this.toTransactionType(updateTransactionDto.type);
+      data.type = updateTransactionDto.type;
     }
 
     if (updateTransactionDto.description !== undefined) {
@@ -125,29 +150,21 @@ export class TransactionsService {
     const amountAsString = String(amount);
 
     if (!/^\d+(\.\d{1,2})?$/.test(amountAsString)) {
-      throw new BadRequestException('Amount must be a valid number');
+      throw new BadRequestException(TRANSACTION_MESSAGES.INVALID_AMOUNT);
     }
 
     const decimal = new Prisma.Decimal(amountAsString);
 
     if (decimal.lessThanOrEqualTo(0)) {
-      throw new BadRequestException('Amount must be greater than zero');
+      throw new BadRequestException(TRANSACTION_MESSAGES.AMOUNT_NOT_POSITIVE);
     }
 
     return decimal;
   }
 
-  private toTransactionType(type: string) {
-    if (type !== TransactionType.expense && type !== TransactionType.income) {
-      throw new BadRequestException('Type must be expense or income');
-    }
-
-    return type;
-  }
-
   private toDescription(description = '') {
     if (description.length > 255) {
-      throw new BadRequestException('Description must be 255 characters or less');
+      throw new BadRequestException(TRANSACTION_MESSAGES.DESCRIPTION_TOO_LONG);
     }
 
     return description;
@@ -157,11 +174,11 @@ export class TransactionsService {
     const parsedDate = new Date(date);
 
     if (Number.isNaN(parsedDate.getTime())) {
-      throw new BadRequestException('Date must be a valid date');
+      throw new BadRequestException(TRANSACTION_MESSAGES.INVALID_DATE);
     }
 
     if (parsedDate > new Date()) {
-      throw new BadRequestException('Date must not be in the future');
+      throw new BadRequestException(TRANSACTION_MESSAGES.FUTURE_DATE);
     }
 
     return parsedDate;
@@ -172,7 +189,7 @@ export class TransactionsService {
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === 'P2025'
     ) {
-      throw new NotFoundException('Transaction not found');
+      throw new NotFoundException(TRANSACTION_MESSAGES.NOT_FOUND);
     }
 
     throw error;

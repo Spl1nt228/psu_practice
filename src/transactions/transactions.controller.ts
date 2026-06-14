@@ -8,10 +8,12 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { CreateTransactionDto } from './dto/create-transaction.dto';
+import { FindTransactionsQueryDto } from './dto/find-transactions-query.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
 import { TransactionsService } from './transactions.service';
 
@@ -28,8 +30,8 @@ export class TransactionsController {
 
   @Get()
   @ApiOperation({ summary: 'Get transactions list' })
-  findAll() {
-    return this.transactionsService.findAll();
+  findAll(@Query() query: FindTransactionsQueryDto) {
+    return this.transactionsService.findAll(query);
   }
 
   @Get(':id')

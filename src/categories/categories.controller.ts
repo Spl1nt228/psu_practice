@@ -8,11 +8,13 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
+import { FindCategoriesQueryDto } from './dto/find-categories-query.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 
 @ApiTags('categories')
@@ -28,8 +30,8 @@ export class CategoriesController {
 
   @Get()
   @ApiOperation({ summary: 'Get categories list' })
-  findAll() {
-    return this.categoriesService.findAll();
+  findAll(@Query() query: FindCategoriesQueryDto) {
+    return this.categoriesService.findAll(query);
   }
 
   @Get(':id')
