@@ -30,16 +30,17 @@ export class CategoriesService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
+    const where = this.buildWhere(query);
+    const orderBy = this.buildOrderBy(query);
 
     const [data, total] = await this.prisma.$transaction([
       this.prisma.category.findMany({
-        orderBy: {
-          name: 'asc',
-        },
+        where,
+        orderBy,
         skip,
         take: limit,
       }),
-      this.prisma.category.count(),
+      this.prisma.category.count({ where }),
     ]);
 
     return {
@@ -51,6 +52,29 @@ export class CategoriesService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  private buildWhere(query: FindCategoriesQueryDto) {
+    const where: Prisma.CategoryWhereInput = {};
+    const search = query.search?.trim();
+
+    if (search) {
+      where.name = {
+        contains: search,
+        mode: 'insensitive',
+      };
+    }
+
+    return where;
+  }
+
+  private buildOrderBy(query: FindCategoriesQueryDto) {
+    const sortBy = query.sortBy ?? 'name';
+    const sortOrder = query.sortOrder ?? 'asc';
+
+    return {
+      [sortBy]: sortOrder,
+    } satisfies Prisma.CategoryOrderByWithRelationInput;
   }
 
   async findOne(id: string) {

@@ -36,19 +36,20 @@ export class TransactionsService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
+    const where = this.buildWhere(query);
+    const orderBy = this.buildOrderBy(query);
 
     const [data, total] = await this.prisma.$transaction([
       this.prisma.transaction.findMany({
+        where,
         include: {
           category: true,
         },
-        orderBy: {
-          date: 'desc',
-        },
+        orderBy,
         skip,
         take: limit,
       }),
-      this.prisma.transaction.count(),
+      this.prisma.transaction.count({ where }),
     ]);
 
     return {
@@ -60,6 +61,51 @@ export class TransactionsService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  private buildWhere(query: FindTransactionsQueryDto) {
+    const where: Prisma.TransactionWhereInput = {};
+    const search = query.search?.trim();
+
+    if (query.type) {
+      where.type = query.type;
+    }
+
+    if (query.categoryId) {
+      where.categoryId = query.categoryId;
+    }
+
+    if (query.dateFrom || query.dateTo) {
+      const dateFrom = query.dateFrom ? new Date(query.dateFrom) : undefined;
+      const dateTo = query.dateTo ? new Date(query.dateTo) : undefined;
+
+      if (dateFrom && dateTo && dateFrom > dateTo) {
+        throw new BadRequestException(TRANSACTION_MESSAGES.INVALID_DATE_RANGE);
+      }
+
+      where.date = {
+        gte: dateFrom,
+        lte: dateTo,
+      };
+    }
+
+    if (search) {
+      where.description = {
+        contains: search,
+        mode: 'insensitive',
+      };
+    }
+
+    return where;
+  }
+
+  private buildOrderBy(query: FindTransactionsQueryDto) {
+    const sortBy = query.sortBy ?? 'date';
+    const sortOrder = query.sortOrder ?? 'desc';
+
+    return {
+      [sortBy]: sortOrder,
+    } satisfies Prisma.TransactionOrderByWithRelationInput;
   }
 
   async findOne(id: string) {

@@ -7,4 +7,5 @@ export const TRANSACTION_MESSAGES = {
   DESCRIPTION_TOO_LONG: 'Description must be 255 characters or less',
   INVALID_DATE: 'Date must be a valid date',
   FUTURE_DATE: 'Date must not be in the future',
+  INVALID_DATE_RANGE: 'dateFrom must be less than or equal to dateTo',
 } as const;

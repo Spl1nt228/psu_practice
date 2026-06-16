@@ -1,6 +1,24 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, Max, Min } from 'class-validator';
+import {
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
+
+enum CategorySortBy {
+  name = 'name',
+  createdAt = 'createdAt',
+}
+
+enum SortOrder {
+  asc = 'asc',
+  desc = 'desc',
+}
 
 export class FindCategoriesQueryDto {
   @ApiPropertyOptional({
@@ -26,4 +44,29 @@ export class FindCategoriesQueryDto {
   @Min(1)
   @Max(100)
   limit?: number;
+
+  @ApiPropertyOptional({
+    example: 'food',
+    description: 'Search by category name',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  search?: string;
+
+  @ApiPropertyOptional({
+    enum: CategorySortBy,
+    default: CategorySortBy.name,
+  })
+  @IsOptional()
+  @IsEnum(CategorySortBy)
+  sortBy?: CategorySortBy;
+
+  @ApiPropertyOptional({
+    enum: SortOrder,
+    default: SortOrder.asc,
+  })
+  @IsOptional()
+  @IsEnum(SortOrder)
+  sortOrder?: SortOrder;
 }
