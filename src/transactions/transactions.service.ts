@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
+import { PRISMA_ERROR_CODES } from '../common/constants/prisma-error-codes';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { FindTransactionsQueryDto } from './dto/find-transactions-query.dto';
@@ -83,10 +84,15 @@ export class TransactionsService {
         throw new BadRequestException(TRANSACTION_MESSAGES.INVALID_DATE_RANGE);
       }
 
-      where.date = {
-        gte: dateFrom,
-        lte: dateTo,
-      };
+      where.date = {};
+
+      if (dateFrom) {
+        where.date.gte = dateFrom;
+      }
+
+      if (dateTo) {
+        where.date.lte = dateTo;
+      }
     }
 
     if (search) {
@@ -192,20 +198,8 @@ export class TransactionsService {
     return data;
   }
 
-  private toDecimal(amount: string | number) {
-    const amountAsString = String(amount);
-
-    if (!/^\d+(\.\d{1,2})?$/.test(amountAsString)) {
-      throw new BadRequestException(TRANSACTION_MESSAGES.INVALID_AMOUNT);
-    }
-
-    const decimal = new Prisma.Decimal(amountAsString);
-
-    if (decimal.lessThanOrEqualTo(0)) {
-      throw new BadRequestException(TRANSACTION_MESSAGES.AMOUNT_NOT_POSITIVE);
-    }
-
-    return decimal;
+  private toDecimal(amount: number) {
+    return new Prisma.Decimal(amount);
   }
 
   private toDescription(description = '') {
@@ -233,7 +227,7 @@ export class TransactionsService {
   private handlePrismaError(error: unknown): never {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === 'P2025'
+      error.code === PRISMA_ERROR_CODES.RECORD_NOT_FOUND
     ) {
       throw new NotFoundException(TRANSACTION_MESSAGES.NOT_FOUND);
     }

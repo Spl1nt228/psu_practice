@@ -1,7 +1,5 @@
--- CreateEnum
 CREATE TYPE "TransactionType" AS ENUM ('expense', 'income');
 
--- CreateTable
 CREATE TABLE "Category" (
     "id" UUID NOT NULL,
     "name" VARCHAR(50) NOT NULL,
@@ -12,7 +10,6 @@ CREATE TABLE "Category" (
     CONSTRAINT "Category_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
 CREATE TABLE "Transaction" (
     "id" UUID NOT NULL,
     "categoryId" UUID NOT NULL,
@@ -26,20 +23,14 @@ CREATE TABLE "Transaction" (
     CONSTRAINT "Transaction_pkey" PRIMARY KEY ("id")
 );
 
--- CreateIndex
 CREATE UNIQUE INDEX "Category_name_key" ON "Category"("name");
 
--- CreateIndex
 CREATE INDEX "Category_createdAt_idx" ON "Category"("createdAt");
 
--- CreateIndex
 CREATE INDEX "Transaction_categoryId_idx" ON "Transaction"("categoryId");
 
--- CreateIndex
 CREATE INDEX "Transaction_date_idx" ON "Transaction"("date");
 
--- CreateIndex
 CREATE INDEX "Transaction_type_idx" ON "Transaction"("type");
 
--- AddForeignKey
 ALTER TABLE "Transaction" ADD CONSTRAINT "Transaction_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "Category"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

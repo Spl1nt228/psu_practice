@@ -20,9 +20,9 @@ export class SummaryService {
     const balance = income.minus(expense);
 
     return {
-      totalIncome: income.toFixed(2),
-      totalExpense: expense.toFixed(2),
-      balance: balance.toFixed(2),
+      totalIncome: income,
+      totalExpense: expense,
+      balance,
       period: {
         dateFrom: dateRange.gte.toISOString(),
         dateTo: dateRange.lte.toISOString(),

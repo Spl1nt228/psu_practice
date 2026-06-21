@@ -13,14 +13,11 @@ import {
   Min,
 } from 'class-validator';
 
+import { SortOrder } from '../../common/dto/sort-order.enum';
+
 enum TransactionSortBy {
   date = 'date',
   amount = 'amount',
-}
-
-enum SortOrder {
-  asc = 'asc',
-  desc = 'desc',
 }
 
 export class FindTransactionsQueryDto {

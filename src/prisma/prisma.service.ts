@@ -3,6 +3,7 @@ import 'dotenv/config';
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
+import { Pool } from 'pg';
 
 @Injectable()
 export class PrismaService
@@ -16,8 +17,14 @@ export class PrismaService
       throw new Error('DATABASE_URL is not set');
     }
 
+    const pool = new Pool({
+      connectionString: databaseUrl,
+    });
+
     super({
-      adapter: new PrismaPg(databaseUrl),
+      adapter: new PrismaPg(pool, {
+        disposeExternalPool: true,
+      }),
     });
   }
 

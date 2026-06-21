@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
+import { PRISMA_ERROR_CODES } from '../common/constants/prisma-error-codes';
 import { CATEGORY_MESSAGES } from './categories.constants';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -110,25 +111,31 @@ export class CategoriesService {
         where: { id },
       });
     } catch (error) {
-      this.handlePrismaError(error);
+      this.handleDeleteError(error);
     }
   }
 
   private handlePrismaError(error: unknown): never {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2002') {
+      if (error.code === PRISMA_ERROR_CODES.UNIQUE_CONSTRAINT_FAILED) {
         throw new ConflictException(CATEGORY_MESSAGES.NAME_EXISTS);
       }
 
-      if (error.code === 'P2003') {
-        throw new ConflictException(CATEGORY_MESSAGES.HAS_TRANSACTIONS);
-      }
-
-      if (error.code === 'P2025') {
+      if (error.code === PRISMA_ERROR_CODES.RECORD_NOT_FOUND) {
         throw new NotFoundException(CATEGORY_MESSAGES.NOT_FOUND);
       }
     }
 
     throw error;
+  }
+
+  private handleDeleteError(error: unknown): never {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === PRISMA_ERROR_CODES.FOREIGN_KEY_CONSTRAINT_FAILED) {
+        throw new ConflictException(CATEGORY_MESSAGES.HAS_TRANSACTIONS);
+      }
+    }
+
+    this.handlePrismaError(error);
   }
 }

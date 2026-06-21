@@ -47,7 +47,7 @@ export class CreateTransactionDto {
 
   @ApiProperty({
     example: '2026-06-10T09:30:00.000Z',
-    description: 'Transaction date',
+    description: 'Transaction date. Must not be later than current date.',
   })
   @IsDateString()
   date: string;

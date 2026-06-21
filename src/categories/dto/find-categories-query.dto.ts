@@ -10,14 +10,11 @@ import {
   Min,
 } from 'class-validator';
 
+import { SortOrder } from '../../common/dto/sort-order.enum';
+
 enum CategorySortBy {
   name = 'name',
   createdAt = 'createdAt',
-}
-
-enum SortOrder {
-  asc = 'asc',
-  desc = 'desc',
 }
 
 export class FindCategoriesQueryDto {
