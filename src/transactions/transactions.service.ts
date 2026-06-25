@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, TransactionType } from '@prisma/client';
 
 import { PRISMA_ERROR_CODES } from '../common/constants/prisma-error-codes';
 import { PrismaService } from '../prisma/prisma.service';
@@ -19,7 +19,7 @@ export class TransactionsService {
   async create(createTransactionDto: CreateTransactionDto) {
     await this.ensureCategoryExists(createTransactionDto.categoryId);
 
-    return this.prisma.transaction.create({
+    const transaction = await this.prisma.transaction.create({
       data: {
         categoryId: createTransactionDto.categoryId,
         amount: this.toDecimal(createTransactionDto.amount),
@@ -31,6 +31,8 @@ export class TransactionsService {
         category: true,
       },
     });
+
+    return this.addBudgetWarningIfNeeded(transaction);
   }
 
   async findAll(query: FindTransactionsQueryDto) {
@@ -139,13 +141,15 @@ export class TransactionsService {
     }
 
     try {
-      return await this.prisma.transaction.update({
+      const transaction = await this.prisma.transaction.update({
         where: { id },
         data: this.buildUpdateData(updateTransactionDto),
         include: {
           category: true,
         },
       });
+
+      return this.addBudgetWarningIfNeeded(transaction);
     } catch (error) {
       this.handlePrismaError(error);
     }
@@ -222,6 +226,79 @@ export class TransactionsService {
     }
 
     return parsedDate;
+  }
+
+  private async addBudgetWarningIfNeeded(transaction: {
+    categoryId: string;
+    type: TransactionType;
+    date: Date;
+  }) {
+    if (transaction.type !== TransactionType.expense) {
+      return transaction;
+    }
+
+    const warning = await this.getBudgetWarning(
+      transaction.categoryId,
+      transaction.date,
+    );
+
+    if (!warning) {
+      return transaction;
+    }
+
+    return {
+      ...transaction,
+      warning,
+    };
+  }
+
+  private async getBudgetWarning(categoryId: string, date: Date) {
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const budget = await this.prisma.budget.findUnique({
+      where: {
+        categoryId_year_month: {
+          categoryId,
+          year,
+          month,
+        },
+      },
+    });
+
+    if (!budget) {
+      return;
+    }
+
+    const range = this.getMonthRange(year, month);
+    const result = await this.prisma.transaction.aggregate({
+      where: {
+        categoryId,
+        type: TransactionType.expense,
+        date: range,
+      },
+      _sum: {
+        amount: true,
+      },
+    });
+    const spent = result._sum.amount ?? new Prisma.Decimal(0);
+
+    if (spent.lte(budget.limit)) {
+      return;
+    }
+
+    return {
+      message: TRANSACTION_MESSAGES.BUDGET_LIMIT_EXCEEDED,
+      limit: budget.limit,
+      spent,
+      overBy: spent.minus(budget.limit),
+    };
+  }
+
+  private getMonthRange(year: number, month: number) {
+    return {
+      gte: new Date(year, month - 1, 1),
+      lt: new Date(year, month, 1),
+    };
   }
 
   private handlePrismaError(error: unknown): never {
