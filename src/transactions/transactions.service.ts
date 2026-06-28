@@ -3,8 +3,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, TransactionType } from '@prisma/client';
 
+import { BudgetsService } from '../budgets/budgets.service';
 import { PRISMA_ERROR_CODES } from '../common/constants/prisma-error-codes';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
@@ -14,12 +15,15 @@ import { TRANSACTION_MESSAGES } from './transactions.constants';
 
 @Injectable()
 export class TransactionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly budgetsService: BudgetsService,
+  ) {}
 
   async create(createTransactionDto: CreateTransactionDto) {
     await this.ensureCategoryExists(createTransactionDto.categoryId);
 
-    return this.prisma.transaction.create({
+    const transaction = await this.prisma.transaction.create({
       data: {
         categoryId: createTransactionDto.categoryId,
         amount: this.toDecimal(createTransactionDto.amount),
@@ -31,6 +35,8 @@ export class TransactionsService {
         category: true,
       },
     });
+
+    return this.addBudgetWarningIfNeeded(transaction);
   }
 
   async findAll(query: FindTransactionsQueryDto) {
@@ -139,13 +145,15 @@ export class TransactionsService {
     }
 
     try {
-      return await this.prisma.transaction.update({
+      const transaction = await this.prisma.transaction.update({
         where: { id },
         data: this.buildUpdateData(updateTransactionDto),
         include: {
           category: true,
         },
       });
+
+      return this.addBudgetWarningIfNeeded(transaction);
     } catch (error) {
       this.handlePrismaError(error);
     }
@@ -222,6 +230,30 @@ export class TransactionsService {
     }
 
     return parsedDate;
+  }
+
+  private async addBudgetWarningIfNeeded(transaction: {
+    categoryId: string;
+    type: TransactionType;
+    date: Date;
+  }) {
+    if (transaction.type !== TransactionType.expense) {
+      return transaction;
+    }
+
+    const warning = await this.budgetsService.getBudgetWarning(
+      transaction.categoryId,
+      transaction.date,
+    );
+
+    if (!warning) {
+      return transaction;
+    }
+
+    return {
+      ...transaction,
+      warning,
+    };
   }
 
   private handlePrismaError(error: unknown): never {
