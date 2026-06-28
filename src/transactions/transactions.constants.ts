@@ -6,5 +6,4 @@ export const TRANSACTION_MESSAGES = {
   INVALID_DATE: 'Date must be a valid date',
   FUTURE_DATE: 'Date must not be in the future',
   INVALID_DATE_RANGE: 'dateFrom must be less than or equal to dateTo',
-  BUDGET_LIMIT_EXCEEDED: 'Budget limit exceeded',
 } as const;

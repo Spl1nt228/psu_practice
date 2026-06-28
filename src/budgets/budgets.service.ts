@@ -177,6 +177,48 @@ export class BudgetsService {
     }
   }
 
+  async getBudgetWarning(categoryId: string, date: Date) {
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const budget = await this.prisma.budget.findUnique({
+      where: {
+        categoryId_year_month: {
+          categoryId,
+          year,
+          month,
+        },
+      },
+    });
+
+    if (!budget) {
+      return;
+    }
+
+    const range = this.getMonthRange(year, month);
+    const result = await this.prisma.transaction.aggregate({
+      where: {
+        categoryId,
+        type: TransactionType.expense,
+        date: range,
+      },
+      _sum: {
+        amount: true,
+      },
+    });
+    const spent = result._sum.amount ?? new Prisma.Decimal(0);
+
+    if (spent.lte(budget.limit)) {
+      return;
+    }
+
+    return {
+      message: BUDGET_MESSAGES.LIMIT_EXCEEDED,
+      limit: budget.limit,
+      spent,
+      overBy: spent.minus(budget.limit),
+    };
+  }
+
   private buildWhere(query: FindBudgetsQueryDto) {
     const where: Prisma.BudgetWhereInput = {};
 

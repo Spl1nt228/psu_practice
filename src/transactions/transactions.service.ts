@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, TransactionType } from '@prisma/client';
 
+import { BudgetsService } from '../budgets/budgets.service';
 import { PRISMA_ERROR_CODES } from '../common/constants/prisma-error-codes';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
@@ -14,7 +15,10 @@ import { TRANSACTION_MESSAGES } from './transactions.constants';
 
 @Injectable()
 export class TransactionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly budgetsService: BudgetsService,
+  ) {}
 
   async create(createTransactionDto: CreateTransactionDto) {
     await this.ensureCategoryExists(createTransactionDto.categoryId);
@@ -237,7 +241,7 @@ export class TransactionsService {
       return transaction;
     }
 
-    const warning = await this.getBudgetWarning(
+    const warning = await this.budgetsService.getBudgetWarning(
       transaction.categoryId,
       transaction.date,
     );
@@ -249,55 +253,6 @@ export class TransactionsService {
     return {
       ...transaction,
       warning,
-    };
-  }
-
-  private async getBudgetWarning(categoryId: string, date: Date) {
-    const year = date.getFullYear();
-    const month = date.getMonth() + 1;
-    const budget = await this.prisma.budget.findUnique({
-      where: {
-        categoryId_year_month: {
-          categoryId,
-          year,
-          month,
-        },
-      },
-    });
-
-    if (!budget) {
-      return;
-    }
-
-    const range = this.getMonthRange(year, month);
-    const result = await this.prisma.transaction.aggregate({
-      where: {
-        categoryId,
-        type: TransactionType.expense,
-        date: range,
-      },
-      _sum: {
-        amount: true,
-      },
-    });
-    const spent = result._sum.amount ?? new Prisma.Decimal(0);
-
-    if (spent.lte(budget.limit)) {
-      return;
-    }
-
-    return {
-      message: TRANSACTION_MESSAGES.BUDGET_LIMIT_EXCEEDED,
-      limit: budget.limit,
-      spent,
-      overBy: spent.minus(budget.limit),
-    };
-  }
-
-  private getMonthRange(year: number, month: number) {
-    return {
-      gte: new Date(year, month - 1, 1),
-      lt: new Date(year, month, 1),
     };
   }
 
