@@ -3,8 +3,12 @@ name: CI/CD
 on:
   push:
     branches:
-      - '**'
+      - main
+      - dev
   pull_request:
+    branches:
+      - main
+      - dev
 
 jobs:
   build:
@@ -35,7 +39,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
 
     steps:
       - name: Deploy to Render
